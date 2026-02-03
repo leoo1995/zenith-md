@@ -1,8 +1,6 @@
 import { saveAs } from 'file-saver';
 
 export const exportToHtml = (markdown: string, filename: string = 'document.html') => {
-    // For proper HTML export we usually want the rendered HTML.
-    // We can get it from the DOM if we give an ID to the preview container.
     const previewElement = document.getElementById('markdown-preview-content');
     if (previewElement) {
         const fullHtml = `
@@ -24,19 +22,27 @@ th,td{border:1px solid #ddd;padding:0.5rem;}
 ${previewElement.innerHTML}
 </body>
 </html>`;
-        const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-        saveAs(blob, filename);
+        try {
+            const file = new File([fullHtml], filename, { type: 'text/html;charset=utf-8' });
+            saveAs(file);
+        } catch (e) {
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            saveAs(blob, filename);
+        }
     } else {
-        // Fallback
-        const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-        saveAs(blob, filename.replace('.html', '.md'));
+        try {
+            const file = new File([markdown], filename.replace('.html', '.md'), { type: 'text/markdown;charset=utf-8' });
+            saveAs(file);
+        } catch (e) {
+            const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+            saveAs(blob, filename.replace('.html', '.md'));
+        }
     }
 };
 
 export const exportToDocx = async (markdown: string, filename: string = 'document.docx') => {
     const { Document, Packer, Paragraph, TextRun } = await import('docx');
     
-    // Simple conversion: Split by newlines and create paragraphs
     const paragraphs = markdown.split('\n').map(line => new Paragraph({
         children: [new TextRun(line)],
     }));
@@ -49,21 +55,50 @@ export const exportToDocx = async (markdown: string, filename: string = 'documen
     });
 
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, filename);
+    try {
+        const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        saveAs(file);
+    } catch (e) {
+        saveAs(blob, filename);
+    }
 };
 
 export const exportToPdf = async (filename: string = 'document.pdf') => {
     const element = document.getElementById('markdown-preview-content');
     if (element) {
         const html2pdf = (await import('html2pdf.js')).default;
+        
+        // Clone the element to manipulate styles for export without affecting the UI
+        const clone = element.cloneNode(true) as HTMLElement;
+        
+        // Force light mode styles on the clone
+        clone.classList.remove('dark', 'dark:prose-invert');
+        clone.style.backgroundColor = 'white';
+        clone.style.color = 'black';
+        clone.style.width = '800px'; // Enforce a width for consistency
+        clone.style.margin = '0 auto';
+        clone.style.padding = '20px';
+        
+        // Append to body temporarily (off-screen) to allow html2pdf to render it
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.appendChild(clone);
+        document.body.appendChild(container);
+
         const opt = {
             margin: 1,
             filename: filename,
             image: { type: 'jpeg' as const, quality: 0.98 },
-            html2canvas: { scale: 2 },
+            html2canvas: { scale: 2, useCORS: true },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
+
+        // Save and cleanup
         // @ts-ignore
-        html2pdf().set(opt).from(element).save();
+        html2pdf().set(opt).from(clone).save().then(() => {
+            document.body.removeChild(container);
+        });
     }
 };

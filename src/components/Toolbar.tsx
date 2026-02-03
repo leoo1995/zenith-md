@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { exportToHtml, exportToDocx, exportToPdf } from '../utils/exportUtils';
 import { ConfirmModal } from './ConfirmModal';
+import { saveAs } from 'file-saver';
 
 
 interface ToolbarProps {
@@ -55,48 +56,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    const handleSaveMd = async () => {
-        try {
-            // Modern File System Access API
-            if ('showSaveFilePicker' in window) {
-                const handle = await (window as any).showSaveFilePicker({
-                    suggestedName: `Zenith-Doc-${new Date().toISOString().split('T')[0]}.md`,
-                    types: [{
-                        description: 'Markdown File',
-                        accept: { 'text/markdown': ['.md'] },
-                    }],
-                });
-                const writable = await handle.createWritable();
-                await writable.write(markdown);
-                await writable.close();
-                return;
-            }
-        } catch (err) {
-            // Ignore cancel errors, fall through to fallback if needed
-            if ((err as Error).name !== 'AbortError') {
-                 console.warn('FileSystemAccess API failed, using fallback', err);
-            } else {
-                return; // User cancelled
-            }
-        }
+   const handleSaveMd = (): void => {
+  if (!markdown) {
+    console.error("No hay contenido para guardar");
+    return;
+  }
 
-        // Fallback: Robust Anchor Download
-        const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        link.download = `Zenith-Doc-${timestamp}.md`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        
-        // Delay cleanup to ensure browser captures the download
-        setTimeout(() => {
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        }, 1000);
-    };
+  // Formato: YYYY-MM-DD-HH-mm-ss
+  const timestamp = new Date().toISOString()
+    .replace(/T/, '-')
+    .replace(/[:.]/g, '-')
+    .slice(0, 19);
+  
+  const filename = `Zenith-Doc-${timestamp}.md`;
+
+  try {
+    // Definimos explícitamente el tipo con el charset para evitar problemas de encoding
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    
+    // saveAs(blob, filename) es la firma más robusta de la librería
+    saveAs(blob, filename);
+    
+    console.log(`Archivo preparado para descarga: ${filename}`);
+  } catch (error) {
+    console.error('Error al generar la descarga:', error);
+  }
+};
 
     const handleExport = async (type: 'html' | 'docx' | 'pdf') => {
         setIsMenuOpen(false);
