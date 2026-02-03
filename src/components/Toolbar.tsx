@@ -165,7 +165,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                 className="hidden" 
             />
 
-            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar py-1">
+            <div className="flex flex-wrap items-center gap-4 py-1">
                 {/* Logo Area */}
                 <div className="flex items-center gap-3 pr-2 border-r border-border/20">
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
@@ -200,15 +200,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                         {isMenuOpen && (
                             <>
                                 <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
-                                <div className="absolute left-0 mt-2 w-48 bg-popover/90 backdrop-blur-xl border border-border/50 rounded-xl shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-                                     <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/20">Download As</div>
-                                    <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors flex items-center gap-2">
+                                <div className="absolute left-0 mt-2 w-48 bg-white dark:bg-zinc-900 border border-border rounded-xl shadow-xl z-[100] py-1 flex flex-col gap-1">
+                                     <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-muted/50">Download As</div>
+                                    <button onClick={() => handleExport('pdf')} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors flex items-center gap-2">
                                         <span>📄</span> PDF Document
                                     </button>
-                                    <button onClick={() => handleExport('docx')} className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors flex items-center gap-2">
+                                    <button onClick={() => handleExport('docx')} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors flex items-center gap-2">
                                         <span>📝</span> Word (.docx)
                                     </button>
-                                    <button onClick={() => handleExport('html')} className="w-full text-left px-4 py-2.5 text-sm text-foreground hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors flex items-center gap-2">
+                                    <button onClick={() => handleExport('html')} className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted transition-colors flex items-center gap-2">
                                         <span>🌐</span> HTML File
                                     </button>
                                 </div>
