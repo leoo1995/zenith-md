@@ -144,7 +144,7 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
                     onKeyDown={handleKeyDown}
                     onSelect={handleSelect}
                     onScroll={handleScroll}
-                    className="w-full h-full p-8 pl-12 pr-12 bg-transparent resize-none outline-none font-mono text-[15px] text-slate-800 dark:text-zinc-300 relative z-10 placeholder:text-muted-foreground/40 selection:bg-indigo-500/30"
+                    className="w-full h-full p-8 pl-12 pr-12 bg-transparent resize-none outline-none font-mono text-[15px] text-slate-800 dark:text-zinc-300 relative z-10 placeholder:text-muted-foreground/40 selection:bg-indigo-500/30 whitespace-pre overflow-x-auto"
                     spellCheck="false"
                     style={{ lineHeight: '28px' }} 
                     placeholder="Start typing..."
