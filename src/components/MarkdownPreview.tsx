@@ -2,6 +2,8 @@ import { forwardRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/atom-one-dark.css';
 import { useEditorStore } from '../store/useEditorStore';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -17,7 +19,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement>((_, ref) => {
         >
             <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeSlug]}
+                rehypePlugins={[rehypeSlug, rehypeHighlight]}
                 components={{
                     // Checkbox styling
                     input: ({ node, ...props }) => {
