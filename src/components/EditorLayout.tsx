@@ -75,7 +75,7 @@ export const EditorLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground transition-colors duration-500 selection:bg-indigo-500/20">
-      <Toolbar />
+      <Toolbar editorRef={editorRef} />
       {/* Main Content Area */}
       <main className="flex flex-1 overflow-hidden relative isolate">
         

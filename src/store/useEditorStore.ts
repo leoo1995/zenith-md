@@ -13,6 +13,12 @@ interface EditorState {
   previewWidth: number;
   setPreviewWidth: (width: number) => void;
   toggleLineCheckbox: (line: number) => void;
+  // History
+  history: string[];
+  historyIndex: number;
+  addToHistory: (newContent: string) => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -20,6 +26,48 @@ export const useEditorStore = create<EditorState>()(
     (set) => ({
       markdown: '# Welcome to Zenith Editor\n\nStart typing...',
       setMarkdown: (markdown) => set({ markdown }),
+      
+      // History
+      history: ['# Welcome to Zenith Editor\n\nStart typing...'],
+      historyIndex: 0,
+      addToHistory: (newContent) => set((state) => {
+         // Create a new history entry only if content changed significantly or enough time passed
+         // For simplicity in this implementation, we assume the caller handles dedup/debounce
+         const currentContent = state.history[state.historyIndex];
+         if (currentContent === newContent) return {};
+
+         const newHistory = state.history.slice(0, state.historyIndex + 1);
+         newHistory.push(newContent);
+         
+         // Helper: Limit history size
+         if (newHistory.length > 50) {
+             newHistory.shift();
+             return { history: newHistory, historyIndex: newHistory.length - 1 };
+         }
+         
+         return { history: newHistory, historyIndex: newHistory.length - 1 };
+      }),
+      undo: () => set((state) => {
+          if (state.historyIndex > 0) {
+              const newIndex = state.historyIndex - 1;
+              return { 
+                  historyIndex: newIndex, 
+                  markdown: state.history[newIndex] 
+              };
+          }
+          return {};
+      }),
+      redo: () => set((state) => {
+          if (state.historyIndex < state.history.length - 1) {
+              const newIndex = state.historyIndex + 1;
+              return { 
+                  historyIndex: newIndex, 
+                  markdown: state.history[newIndex] 
+              };
+          }
+          return {};
+      }),
+
       isZenMode: false,
       toggleZenMode: () => set((state) => ({ isZenMode: !state.isZenMode })),
       theme: 'dark',
@@ -38,7 +86,11 @@ export const useEditorStore = create<EditorState>()(
               } else if (content.match(/\[x\]/i)) {
                   lines[index] = content.replace(/\[x\]/i, '[ ]');
               }
-              return { markdown: lines.join('\n') };
+              const newMarkdown = lines.join('\n');
+              // Implicitly add to history on checkbox toggle
+              const newHistory = state.history.slice(0, state.historyIndex + 1);
+              newHistory.push(newMarkdown);
+              return { markdown: newMarkdown, history: newHistory, historyIndex: newHistory.length -1 };
           }
           return {};
       }),
@@ -49,7 +101,9 @@ export const useEditorStore = create<EditorState>()(
         markdown: state.markdown, 
         theme: state.theme,
         outlineWidth: state.outlineWidth,
-        previewWidth: state.previewWidth
+        previewWidth: state.previewWidth,
+        // Don't persist history to avoid bloat, or do? User didn't specify. 
+        // Persisting text but not history is safer for storage limits.
       }), 
     }
   )
