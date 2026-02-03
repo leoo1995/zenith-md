@@ -2,21 +2,26 @@ import React, { useState } from 'react';
 import { useEditorStore } from '../store/useEditorStore';
 import { Moon, Sun, Maximize2, Minimize2, Download, FilePlus, ChevronDown } from 'lucide-react';
 import { exportToHtml, exportToDocx, exportToPdf } from '../utils/exportUtils';
+import { ConfirmModal } from './ConfirmModal';
 
 export const Toolbar: React.FC = () => {
     const { 
         theme, toggleTheme, isZenMode, toggleZenMode, markdown, setMarkdown 
     } = useEditorStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-    const handleNewFile = () => {
+    const handleNewFileClick = () => {
         if (markdown.trim().length > 0 && markdown !== '# Welcome to Zenith Editor\n\nStart typing...') {
-            if (confirm('Create new file? Unsaved changes will be overwritten (unless just exported).')) {
-                setMarkdown('');
-            }
+            setIsConfirmOpen(true);
         } else {
             setMarkdown('');
         }
+    };
+
+    const confirmNewFile = () => {
+        setMarkdown('');
+        setIsConfirmOpen(false);
     };
 
     const handleExport = (type: 'html' | 'docx' | 'pdf') => {
@@ -28,6 +33,14 @@ export const Toolbar: React.FC = () => {
 
     return (
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/40 z-50 sticky top-0 bg-background/60 backdrop-blur-xl transition-all duration-500">
+            <ConfirmModal 
+                isOpen={isConfirmOpen}
+                title="Create New File?"
+                message="Unsaved changes will be lost. Are you sure you want to start a new file?"
+                onConfirm={confirmNewFile}
+                onCancel={() => setIsConfirmOpen(false)}
+            />
+
             <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-500 dark:text-indigo-400">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><path d="M11 11l-4.393 -4.393"></path></svg>
@@ -38,7 +51,7 @@ export const Toolbar: React.FC = () => {
             <div className="flex items-center gap-2">
                 {/* New File */}
                 <button
-                    onClick={handleNewFile}
+                    onClick={handleNewFileClick}
                     className="p-2 rounded-lg hover:bg-muted/80 transition-all duration-200 text-muted-foreground hover:text-foreground active:scale-95"
                     title="New File"
                 >
