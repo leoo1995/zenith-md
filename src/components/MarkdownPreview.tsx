@@ -19,13 +19,14 @@ export const MarkdownPreview = forwardRef<HTMLDivElement>((_, ref) => {
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeSlug]}
                 components={{
+                    // Checkbox styling
                     input: ({ node, ...props }) => {
                         if (props.type === 'checkbox') {
                              return (
                                 <input 
                                     type="checkbox" 
                                     checked={props.checked} 
-                                    className="mr-2 cursor-pointer accent-indigo-600"
+                                    className="mr-2 cursor-pointer accent-indigo-600 rounded-sm w-4 h-4 text-indigo-600 focus:ring-indigo-500"
                                     onChange={() => {}} 
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -38,7 +39,25 @@ export const MarkdownPreview = forwardRef<HTMLDivElement>((_, ref) => {
                             );
                         }
                         return <input {...props} />;
-                    }
+                    },
+                    // Table styling
+                    table: ({ node, ...props }) => (
+                        <div className="overflow-x-auto my-6 rounded-lg border border-border/50 shadow-sm bg-card/30">
+                            <table className="w-full text-left text-sm text-foreground" {...props} />
+                        </div>
+                    ),
+                    thead: ({ node, ...props }) => (
+                        <thead className="bg-muted/50 text-muted-foreground uppercase tracking-wider text-xs font-semibold" {...props} />
+                    ),
+                    th: ({ node, ...props }) => (
+                        <th className="px-6 py-4 border-b border-border/50" {...props} />
+                    ),
+                    td: ({ node, ...props }) => (
+                        <td className="px-6 py-4 border-b border-border/10 whitespace-nowrap" {...props} />
+                    ),
+                    tr: ({ node, ...props }) => (
+                        <tr className="hover:bg-muted/30 transition-colors" {...props} />
+                    )
                 }}
             >
                 {debouncedMarkdown}

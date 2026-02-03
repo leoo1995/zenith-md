@@ -16,24 +16,48 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        const textarea = e.currentTarget;
+        const start = textarea.selectionStart;
+        const value = textarea.value;
+
+        if (e.key === ' ') {
+            // Smart Checkbox: Convert "[ ] " to "- [ ] "
+            // Get text before cursor on current line
+            const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+            const textSinceLineStart = value.substring(lineStart, start);
+            
+            // Check if user typed "[ ]" (or " [ ]") at start of line
+            if (/^\s*\[ \]$/.test(textSinceLineStart)) {
+                e.preventDefault();
+                const prefix = textSinceLineStart.match(/^\s*/)?.[0] || '';
+                const replacement = `${prefix}- [ ] `;
+                
+                const newValue = value.substring(0, lineStart) + replacement + value.substring(start);
+                setMarkdown(newValue);
+                
+                requestAnimationFrame(() => {
+                     textarea.selectionStart = textarea.selectionEnd = lineStart + replacement.length;
+                });
+            }
+        }
+
         if (e.key === 'Enter') {
-            const textarea = e.currentTarget;
-            const start = textarea.selectionStart;
-            const value = textarea.value;
             
             // Get current line up to cursor
             const lineStart = value.lastIndexOf('\n', start - 1) + 1;
             const currentLine = value.substring(lineStart, start);
             
             // Regex for list items (- , * , 1. ) and blockquotes (> )
-            const listMatch = currentLine.match(/^(\s*)([-*]|\d+\.|>)(\s+)/);
+            // Also supports task lists "- [ ]" or "- [x]"
+            const listMatch = currentLine.match(/^(\s*)([-*]|\d+\.|>)(\s+(\[([ x])\]\s)?)/);
             
             if (listMatch) {
                 e.preventDefault();
                 const [, indent, marker, space] = listMatch;
+                const hasCheckbox = space.includes('[');
                 
                 // If the line is empty (just the marker), finish the list
-                if (currentLine.trim() === marker.trim()) {
+                if (currentLine.trim() === marker.trim() || (hasCheckbox && currentLine.trim() === `${marker} [ ]`)) {
                      const newValue = value.substring(0, lineStart) + value.substring(start);
                      setMarkdown(newValue);
                      // Set cursor
@@ -50,7 +74,10 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
                     nextMarker = `${num + 1}.`;
                 }
 
-                const insertion = `\n${indent}${nextMarker}${space}`;
+                // Maintain checkbox state (always unchecked for new line)
+                const nextSpace = hasCheckbox ? ' [ ] ' : ' ';
+
+                const insertion = `\n${indent}${nextMarker}${nextSpace}`;
                 const newValue = value.substring(0, start) + insertion + value.substring(textarea.selectionEnd);
                 
                 setMarkdown(newValue);
@@ -104,10 +131,10 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
 
             {/* Textarea */}
             <div className="flex-1 h-full relative">
-                 {/* Active Line Highlight Background - Optional enhancement */}
+                 {/* Active Line Highlight Background */}
                  <div 
-                    className="absolute w-full h-[24px] bg-indigo-50/50 dark:bg-indigo-900/20 pointer-events-none transition-all duration-100 mt-8"
-                    style={{ top: `${(activeLine - 1) * 24}px` }} 
+                    className="absolute w-full h-[28px] bg-indigo-500/5 dark:bg-indigo-500/10 pointer-events-none transition-all duration-200 ease-out mt-8 border-l-2 border-indigo-500/50 backdrop-blur-[1px]"
+                    style={{ top: `${(activeLine - 1) * 28}px` }} 
                  ></div>
 
                 <textarea
@@ -117,10 +144,10 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
                     onKeyDown={handleKeyDown}
                     onSelect={handleSelect}
                     onScroll={handleScroll}
-                    className="w-full h-full p-8 pl-4 pr-4 bg-transparent resize-none outline-none font-mono text-base leading-relaxed text-slate-800 dark:text-zinc-300 relative z-10"
-                    spellCheck={false}
-                    style={{ lineHeight: '24px' }} 
-                    placeholder="# Start writing..."
+                    className="w-full h-full p-8 pl-12 pr-12 bg-transparent resize-none outline-none font-mono text-[15px] text-slate-800 dark:text-zinc-300 relative z-10 placeholder:text-muted-foreground/40 selection:bg-indigo-500/30"
+                    spellCheck="false"
+                    style={{ lineHeight: '28px' }} 
+                    placeholder="Start typing..."
                 />
             </div>
         </div>
