@@ -33,12 +33,12 @@ export const Outline: React.FC = () => {
     }
 
     return (
-        <ul className="space-y-1 p-4">
+        <ul className="space-y-0.5 p-4">
             {headings.map((heading, index) => (
                 <li key={`${heading.id}-${index}`} style={{ paddingLeft: `${(heading.level - 1) * 12}px` }}>
                     <button 
                         onClick={() => handleScrollTo(heading.id)}
-                        className="text-sm text-left truncate w-full hover:text-indigo-600 dark:hover:text-indigo-400 text-slate-600 dark:text-zinc-400 transition-colors"
+                        className="text-[13px] text-left truncate w-full py-1 px-2 rounded-md hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all duration-200 border border-transparent hover:border-border/40"
                     >
                         {heading.text}
                     </button>

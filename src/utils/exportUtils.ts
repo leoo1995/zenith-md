@@ -1,7 +1,4 @@
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
-// html2pdf.js doesn't have good TS types usually, require casting or ignore
-import html2pdf from 'html2pdf.js';
 
 export const exportToHtml = (markdown: string, filename: string = 'document.html') => {
     // For proper HTML export we usually want the rendered HTML.
@@ -37,6 +34,8 @@ ${previewElement.innerHTML}
 };
 
 export const exportToDocx = async (markdown: string, filename: string = 'document.docx') => {
+    const { Document, Packer, Paragraph, TextRun } = await import('docx');
+    
     // Simple conversion: Split by newlines and create paragraphs
     const paragraphs = markdown.split('\n').map(line => new Paragraph({
         children: [new TextRun(line)],
@@ -53,9 +52,10 @@ export const exportToDocx = async (markdown: string, filename: string = 'documen
     saveAs(blob, filename);
 };
 
-export const exportToPdf = (filename: string = 'document.pdf') => {
+export const exportToPdf = async (filename: string = 'document.pdf') => {
     const element = document.getElementById('markdown-preview-content');
     if (element) {
+        const html2pdf = (await import('html2pdf.js')).default;
         const opt = {
             margin: 1,
             filename: filename,

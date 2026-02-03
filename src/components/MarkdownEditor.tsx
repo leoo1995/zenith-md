@@ -93,8 +93,8 @@ export const MarkdownEditor = forwardRef<HTMLTextAreaElement>((_, ref) => {
                     <div 
                         key={num} 
                         className={clsx(
-                            "h-[24px] transition-colors duration-150", 
-                            activeLine === num && "text-indigo-600 dark:text-indigo-400 font-bold"
+                            "h-[28px] text-[13px] transition-colors duration-150 flex items-center justify-end font-mono", 
+                            activeLine === num ? "text-indigo-500 font-bold opacity-100" : "text-muted-foreground/30"
                         )}
                     >
                         {num}
