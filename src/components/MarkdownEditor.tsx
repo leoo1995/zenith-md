@@ -5,10 +5,11 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
 import { EditorView, keymap } from '@codemirror/view';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+import { githubLight } from '@uiw/codemirror-theme-github';
 
 // Expose the textarea ref to parent
 export const MarkdownEditor = forwardRef((_, ref) => {
-    const { markdown: content, setMarkdown } = useEditorStore();
+    const { markdown: content, setMarkdown, theme } = useEditorStore();
     const editorRef = useRef<any>(null); // react-codemirror ref
 
     useImperativeHandle(ref, () => {
@@ -90,7 +91,7 @@ export const MarkdownEditor = forwardRef((_, ref) => {
                 ref={editorRef}
                 value={content}
                 height="100%"
-                theme={vscodeDark}
+                theme={theme === 'dark' ? vscodeDark : githubLight}
                 extensions={[
                     markdown({ base: markdownLanguage, codeLanguages: languages }),
                     EditorView.lineWrapping, 
