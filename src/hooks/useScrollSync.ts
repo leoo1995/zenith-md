@@ -7,8 +7,16 @@ export const useScrollSync = (
   const isScrollingRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const el1 = ref1.current;
-    const el2 = ref2.current;
+    // Helper to get the actual scrollable element
+    const getScrollElement = (current: any): HTMLElement | null => {
+        if (!current) return null;
+        if (current.scrollDOM) return current.scrollDOM as HTMLElement; // CodeMirror View
+        if (current instanceof HTMLElement) return current;
+        return null;
+    };
+
+    const el1 = getScrollElement(ref1.current);
+    const el2 = getScrollElement(ref2.current);
 
     if (!el1 || !el2) return;
 
@@ -43,5 +51,5 @@ export const useScrollSync = (
       el2.removeEventListener('scroll', onScroll2);
       clearTimeout(timeoutId);
     };
-  }, [ref1, ref2]); // Re-bind if refs change (unlikely)
+  }, [ref1, ref2]); // Re-bind if refs change
 };

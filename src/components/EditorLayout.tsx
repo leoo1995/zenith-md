@@ -16,7 +16,7 @@ export const EditorLayout: React.FC = () => {
     outlineWidth, setOutlineWidth, previewWidth, setPreviewWidth 
   } = useEditorStore();
 
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<any>(null); // Holds CodeMirror EditorView instance
   const previewRef = useRef<HTMLDivElement>(null);
 
   useScrollSync(editorRef, previewRef);

@@ -11,7 +11,7 @@ import { saveAs } from 'file-saver';
 
 
 interface ToolbarProps {
-    editorRef: React.RefObject<HTMLTextAreaElement | null>;
+    editorRef: React.RefObject<any>;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
@@ -99,72 +99,67 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
 
     // --- Formatting ---
     const insertFormat = (prefix: string, suffix: string = '') => {
-        const textarea = editorRef.current;
-        if (!textarea) return;
+        const view = editorRef.current;
+        if (!view || !view.dispatch) return;
 
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        const selectedText = text.substring(start, end);
-
-        const before = text.substring(0, start);
-        const after = text.substring(end);
-
-        // Check if already applied (naive check for partial toggle)
-        // For simplicity, we just wrap. Enhancements: check surrounding chars.
+        const { state, dispatch } = view;
+        const { from, to } = state.selection.main;
+        const selectedText = state.sliceDoc(from, to);
         
-        const newText = before + prefix + selectedText + suffix + after;
-        setMarkdown(newText);
-        addToHistory(newText);
+        const textToInsert = prefix + selectedText + suffix;
         
-        requestAnimationFrame(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + prefix.length, end + prefix.length);
+        dispatch({
+            changes: { from, to, insert: textToInsert },
+            selection: { anchor: from + prefix.length, head: from + prefix.length + selectedText.length },
+            userEvent: 'input.format'
         });
+        
+        view.focus();
     };
 
     const insertBlockFormat = (prefix: string) => {
-        const textarea = editorRef.current;
-        if (!textarea) return;
+        const view = editorRef.current;
+        if (!view || !view.dispatch) return;
 
-        const start = textarea.selectionStart;
-        const text = textarea.value;
+        const { state, dispatch } = view;
+        const { from } = state.selection.main;
+        const line = state.doc.lineAt(from);
+        const lineText = line.text;
         
-        // Find start of current line
-        const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-        const lineEnd = text.indexOf('\n', start);
-        const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
-        
-        const currentLine = text.substring(lineStart, actualLineEnd);
-        
-        // Toggle if already exists
-        let newLine = currentLine;
-        if (currentLine.startsWith(prefix)) {
-            newLine = currentLine.substring(prefix.length);
-        } else if (prefix === '# ' || prefix === '## ' || prefix === '### ') {
-             // specific logic for headers to replace other headers
-             newLine = prefix + currentLine.replace(/^#{1,6}\s/, '');
+        let changes;
+
+        if (lineText.startsWith(prefix)) {
+             // Toggle off
+             changes = { from: line.from, to: line.from + prefix.length, insert: '' };
+        } else if (['# ', '## ', '### '].includes(prefix)) {
+             // Replace existing header
+             const match = lineText.match(/^#{1,6}\s/);
+             if (match) {
+                 changes = { from: line.from, to: line.from + match[0].length, insert: prefix };
+             } else {
+                 changes = { from: line.from, insert: prefix };
+             }
         } else {
-            newLine = prefix + currentLine;
+             // Add prefix
+             changes = { from: line.from, insert: prefix };
         }
-
-        const newText = text.substring(0, lineStart) + newLine + text.substring(actualLineEnd);
-        setMarkdown(newText);
-        addToHistory(newText);
-
-        requestAnimationFrame(() => {
-            textarea.focus();
-            // Move cursor to end of line or maintain relative pos?
-            textarea.setSelectionRange(lineStart + newLine.length, lineStart + newLine.length);
-        });
+        
+        dispatch({ changes, userEvent: 'input.format' });
+        view.focus();
     };
 
     const formatDocument = () => {
-         // remove trailing whitespace, condense multiple newlines to max 2
-         let newText = markdown.replace(/[ \t]+$/gm, ''); // trailing spaces
-         newText = newText.replace(/\n{3,}/g, '\n\n'); // multiple breaks
-         setMarkdown(newText);
-         addToHistory(newText);
+         const view = editorRef.current;
+         if (!view || !view.dispatch) return;
+
+         const doc = view.state.doc.toString();
+         let newText = doc.replace(/[ \t]+$/gm, ''); 
+         newText = newText.replace(/\n{3,}/g, '\n\n'); 
+         
+         view.dispatch({
+             changes: { from: 0, to: view.state.doc.length, insert: newText },
+             userEvent: 'input.format.document'
+         });
     };
 
     // --- Helper for Button Styles ---
