@@ -85,6 +85,16 @@ export const MarkdownEditor = forwardRef((_, ref) => {
         }
     ]), []);
 
+    // CSS Transition for Active Line
+    const smoothTransitionTheme = React.useMemo(() => EditorView.theme({
+        "& .cm-activeLine": {
+            transition: "background-color 0.3s ease-out"
+        },
+        "& .cm-activeLineGutter": {
+            transition: "background-color 0.3s ease-out"
+        }
+    }), []);
+
     return (
         <div className="h-full w-full bg-transparent relative overflow-hidden text-base">
              <CodeMirror
@@ -95,7 +105,8 @@ export const MarkdownEditor = forwardRef((_, ref) => {
                 extensions={[
                     markdown({ base: markdownLanguage, codeLanguages: languages }),
                     EditorView.lineWrapping, 
-                    smartListKeymap
+                    smartListKeymap,
+                    smoothTransitionTheme
                 ]}
                 onChange={onChange}
                 className="h-full text-[15px]" 

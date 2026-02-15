@@ -10,6 +10,13 @@ import { ConfirmModal } from './ConfirmModal';
 import { saveAs } from 'file-saver';
 
 
+import GoogleAuthButton from './GoogleAuthButton';
+import { useGoogleStore } from '../store/useGoogleStore';
+import { saveFileToDrive, loadFileFromDrive, loadPicker, openDrivePicker } from '../services/googleDriveService';
+import { Cloud, DownloadCloud } from 'lucide-react';
+
+import { InputModal } from './InputModal';
+
 interface ToolbarProps {
     editorRef: React.RefObject<any>;
 }
@@ -19,9 +26,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         theme, toggleTheme, isZenMode, toggleZenMode, markdown, setMarkdown,
         history, historyIndex, undo, redo, addToHistory
     } = useEditorStore();
+    // ... (previous imports)
+
+
+    // ... (inside Toolbar component)
+    const { isAuthenticated, accessToken, logout } = useGoogleStore(); // Access Google Store and logout
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [isInputOpen, setIsInputOpen] = useState(false); // State for InputModal
     const [isExporting, setIsExporting] = useState(false);
+    const [isDriveLoading, setIsDriveLoading] = useState(false); 
+    
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // --- File Operations ---
@@ -36,9 +52,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
     const confirmNewFile = () => {
         setMarkdown('');
         setIsConfirmOpen(false);
-        // Reset history
-        // ideally we should clear history here but store doesn't expose it. 
-        // calling setMarkdown adds to history via our effect (if we had one) or we just accept it starts a new history node.
     };
 
     const handleOpenFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,6 +67,72 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         }
         // Reset input
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    // --- Google Drive Operations ---
+     const handleSaveToDriveClick = () => {
+        if (!accessToken) return;
+        setIsInputOpen(true);
+     };
+
+     const handleConfirmSave = async (filename: string) => {
+        setIsInputOpen(false);
+        if (!accessToken || !filename) return;
+        
+        setIsDriveLoading(true);
+        try {
+            await saveFileToDrive(filename, markdown, accessToken);
+            alert("Saved to Google Drive!");
+        } catch (error: any) {
+             console.error("Save to Drive failed", error);
+             // Check for 401 (Unauthorized) or 403 (Insufficient Permissions)
+             if (error.message.includes('401') || error.message.includes('Unauthorized') || 
+                 error.message.includes('403') || error.message.includes('Insufficient Permission')) {
+                 alert("Session expired or insufficient permissions. Please sign in again to grant access.");
+                 logout();
+             } else {
+                 alert("Failed to save to Drive. See console.");
+             }
+        } finally {
+            setIsDriveLoading(false);
+        }
+    };
+
+    const handleOpenFromDrive = async () => {
+        if (!accessToken) return;
+        setIsDriveLoading(true);
+        try {
+            // Ensure Picker is loaded
+            if (!window.google || !window.google.picker) {
+                await loadPicker();
+            }
+            
+            const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+            if (!apiKey) {
+                alert("Please set VITE_GOOGLE_API_KEY to use the File Picker.");
+                setIsDriveLoading(false);
+                return;
+            }
+
+            const file = await openDrivePicker(accessToken, apiKey);
+            if (file) {
+                 const content = await loadFileFromDrive(file.id, accessToken);
+                 setMarkdown(content);
+                 addToHistory(content);
+            }
+        } catch (error: any) {
+            console.error("Open from Drive failed", error);
+             // Check for 401 (Unauthorized) or 403 (Insufficient Permissions)
+             if (error.message.includes('401') || error.message.includes('Unauthorized') || 
+                 error.message.includes('403') || error.message.includes('Insufficient Permission')) {
+                 alert("Session expired or insufficient permissions. Please sign in again to grant access.");
+                 logout();
+             } else {
+                alert("Failed to open from Drive. See console.");
+             }
+        } finally {
+             setIsDriveLoading(false);
+        }
     };
 
    const handleSaveMd = (): void => {
@@ -174,6 +253,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                 onConfirm={confirmNewFile}
                 onCancel={() => setIsConfirmOpen(false)}
             />
+            <InputModal
+                isOpen={isInputOpen}
+                title="Save to Google Drive"
+                message="Enter a filename for your document:"
+                defaultValue="zenith-doc.md"
+                onConfirm={handleConfirmSave}
+                onCancel={() => setIsInputOpen(false)}
+            />
             {/* Hidden Input for Open File */}
             <input 
                 type="file" 
@@ -235,7 +322,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                     </div>
                 </div>
 
-                {/* Group 2: History */}
+                 {/* Group 2: Drive Actions */}
+                 {isAuthenticated && (
+                    <div className="flex items-center gap-1 border-r border-border/20 pr-2">
+                         <button 
+                            onClick={handleSaveToDriveClick} 
+                            className={btnClass} 
+                            title="Save to Drive"
+                            disabled={isDriveLoading}
+                         >
+                            {isDriveLoading ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+                         </button>
+                         <button 
+                            onClick={handleOpenFromDrive} 
+                            className={btnClass} 
+                            title="Open from Drive"
+                            disabled={isDriveLoading}
+                         >
+                            <DownloadCloud size={18} />
+                         </button>
+                    </div>
+                 )}
+
+                {/* Group 3: History */}
                 <div className="flex items-center gap-1 border-r border-border/20 pr-2">
                      <button 
                         onClick={undo} 
@@ -255,7 +364,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                     </button>
                 </div>
 
-                {/* Group 3: Formatting */}
+                {/* Group 4: Formatting */}
                 <div className="flex items-center gap-1 border-r border-border/20 pr-2">
                     <button onClick={() => insertBlockFormat('# ')} className={btnClass} title="Heading 1"><Heading1 size={18} /></button>
                     <button onClick={() => insertBlockFormat('## ')} className={btnClass} title="Heading 2"><Heading2 size={18} /></button>
@@ -272,7 +381,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                     <button onClick={() => insertBlockFormat('- [ ] ')} className={btnClass} title="Task List"><CheckSquare size={18} /></button>
                 </div>
 
-                {/* Group 4: Special */}
+                {/* Group 5: Special */}
                 <div className="flex items-center gap-1">
                     <button onClick={formatDocument} className={btnClass} title="Format Document">
                         <Eraser size={18} />
@@ -282,6 +391,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
 
             {/* Right Side: Toggles */}
             <div className="flex items-center gap-2 ml-auto">
+                <GoogleAuthButton />
                 <button onClick={toggleZenMode} className={btnClass} title={isZenMode ? "Exit Zen Mode" : "Enter Zen Mode"}>
                     {isZenMode ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
@@ -292,3 +402,4 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         </header>
     );
 };
+
