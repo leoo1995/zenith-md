@@ -1,4 +1,4 @@
-import React, { useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
 import { useEditorStore } from '../store/useEditorStore';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -7,15 +7,20 @@ import { EditorView, keymap } from '@codemirror/view';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import { githubLight } from '@uiw/codemirror-theme-github';
 
-// Expose the textarea ref to parent
+// Expose the EditorView instance to parent via ref
 export const MarkdownEditor = forwardRef((_, ref) => {
     const { markdown: content, setMarkdown, theme } = useEditorStore();
-    const editorRef = useRef<any>(null); // react-codemirror ref
 
-    useImperativeHandle(ref, () => {
-        // Return the CodeMirror EditorView instance
-        return editorRef.current?.view;
-    }, []);
+    // EditorView instance is exposed to parent via ref
+    const onEditorCreate = React.useCallback((view: EditorView) => {
+        if (ref) {
+            if (typeof ref === 'function') {
+                ref(view);
+            } else {
+                (ref as React.MutableRefObject<any>).current = view;
+            }
+        }
+    }, [ref]);
 
     const onChange = React.useCallback((value: string) => {
         setMarkdown(value);
@@ -98,7 +103,7 @@ export const MarkdownEditor = forwardRef((_, ref) => {
     return (
         <div className="h-full w-full bg-transparent relative overflow-hidden text-base">
              <CodeMirror
-                ref={editorRef}
+                onCreateEditor={onEditorCreate}
                 value={content}
                 height="100%"
                 theme={theme === 'dark' ? vscodeDark : githubLight}
