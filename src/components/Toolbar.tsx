@@ -22,9 +22,10 @@ interface ToolbarProps {
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
-    const { 
+    const {
         theme, toggleTheme, isZenMode, toggleZenMode, markdown, setMarkdown,
-        history, historyIndex, undo, redo, addToHistory
+        history, historyIndex, undo, redo, addToHistory,
+        driveFileId, setDriveFileId
     } = useEditorStore();
     // ... (previous imports)
 
@@ -36,9 +37,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [isInputOpen, setIsInputOpen] = useState(false); // State for InputModal
     const [isExporting, setIsExporting] = useState(false);
-    const [isDriveLoading, setIsDriveLoading] = useState(false); 
-    
+    const [isDriveLoading, setIsDriveLoading] = useState(false);
+    const [pendingSaveName, setPendingSaveName] = useState<string>('');
+
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // --- Helper: Infer Filename ---
+    const inferFilename = (): string => {
+        const match = markdown.match(/^#\s+(.+)$/m);
+        if (match && match[1]) {
+            return match[1].trim() + '.md';
+        }
+        const timestamp = new Date().toISOString().slice(0, 10);
+        return `Untitled-${timestamp}.md`;
+    };
 
     // --- File Operations ---
     const handleNewFileClick = () => {
@@ -46,11 +58,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
             setIsConfirmOpen(true);
         } else {
             setMarkdown('');
+            setDriveFileId(null); // Reset Drive ID for new file
         }
     };
 
     const confirmNewFile = () => {
         setMarkdown('');
+        setDriveFileId(null);
         setIsConfirmOpen(false);
     };
 
@@ -62,6 +76,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                 const content = e.target?.result as string;
                 setMarkdown(content);
                 addToHistory(content);
+                setDriveFileId(null); // Reset Drive ID for local file open
             };
             reader.readAsText(file);
         }
@@ -69,26 +84,57 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
-    // --- Google Drive Operations ---
-     const handleSaveToDriveClick = () => {
-        if (!accessToken) return;
-        setIsInputOpen(true);
-     };
+    // --- Unified Save ---
+    const handleSaveClick = () => {
+        if (!accessToken) {
+            // Not authenticated -> Local Save
+            handleLocalSave();
+        } else {
+            // Authenticated -> Drive Save
+            if (driveFileId) {
+                // If we already have an ID, update directly
+                handleDriveSave(inferFilename(), driveFileId);
+            } else {
+                // New file on Drive -> Ask for name
+                setPendingSaveName(inferFilename());
+                setIsInputOpen(true);
+            }
+        }
+    };
 
-     const handleConfirmSave = async (filename: string) => {
+    const handleLocalSave = () => {
+         const filename = inferFilename();
+         try {
+            const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+            saveAs(blob, filename);
+         } catch (error) {
+            console.error('Error al generar la descarga:', error);
+         }
+    };
+
+    // Called by InputModal confirm
+    const handleConfirmDriveSave = async (filename: string) => {
         setIsInputOpen(false);
-        if (!accessToken || !filename) return;
-        
+        handleDriveSave(filename);
+    };
+
+    const handleDriveSave = async (filename: string, existingId?: string) => {
+        if (!accessToken) return;
+
         setIsDriveLoading(true);
         try {
-            await saveFileToDrive(filename, markdown, accessToken);
-            alert("Saved to Google Drive!");
+            const response = await saveFileToDrive(filename, markdown, accessToken, existingId);
+            if (response && response.id) {
+                setDriveFileId(response.id);
+                // Only show alert if it was a manual new save, updates can be silent or toast (using alert for now)
+                if (!existingId) alert("Saved to Google Drive!");
+            }
         } catch (error: any) {
              console.error("Save to Drive failed", error);
              // Check for 401 (Unauthorized) or 403 (Insufficient Permissions)
-             if (error.message.includes('401') || error.message.includes('Unauthorized') || 
+             if (error.message.includes('401') || error.message.includes('Unauthorized') ||
                  error.message.includes('403') || error.message.includes('Insufficient Permission')) {
-                 alert("Session expired or insufficient permissions. Please sign in again to grant access.");
+                 alert("Session expired or insufficient permissions. Please sign in again.");
                  logout();
              } else {
                  alert("Failed to save to Drive. See console.");
@@ -98,6 +144,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         }
     };
 
+    // --- Drive Open ---
     const handleOpenFromDrive = async () => {
         if (!accessToken) return;
         setIsDriveLoading(true);
@@ -106,7 +153,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
             if (!window.google || !window.google.picker) {
                 await loadPicker();
             }
-            
+
             const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
             if (!apiKey) {
                 alert("Please set VITE_GOOGLE_API_KEY to use the File Picker.");
@@ -119,13 +166,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                  const content = await loadFileFromDrive(file.id, accessToken);
                  setMarkdown(content);
                  addToHistory(content);
+                 setDriveFileId(file.id); // Track the Drive ID
             }
         } catch (error: any) {
             console.error("Open from Drive failed", error);
              // Check for 401 (Unauthorized) or 403 (Insufficient Permissions)
-             if (error.message.includes('401') || error.message.includes('Unauthorized') || 
+             if (error.message.includes('401') || error.message.includes('Unauthorized') ||
                  error.message.includes('403') || error.message.includes('Insufficient Permission')) {
-                 alert("Session expired or insufficient permissions. Please sign in again to grant access.");
+                 alert("Session expired or insufficient permissions. Please sign in again.");
                  logout();
              } else {
                 alert("Failed to open from Drive. See console.");
@@ -134,33 +182,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
              setIsDriveLoading(false);
         }
     };
-
-   const handleSaveMd = (): void => {
-  if (!markdown) {
-    console.error("No hay contenido para guardar");
-    return;
-  }
-
-  // Formato: YYYY-MM-DD-HH-mm-ss
-  const timestamp = new Date().toISOString()
-    .replace(/T/, '-')
-    .replace(/[:.]/g, '-')
-    .slice(0, 19);
-  
-  const filename = `Zenith-Doc-${timestamp}.md`;
-
-  try {
-    // Definimos explícitamente el tipo con el charset para evitar problemas de encoding
-    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-    
-    // saveAs(blob, filename) es la firma más robusta de la librería
-    saveAs(blob, filename);
-    
-    console.log(`Archivo preparado para descarga: ${filename}`);
-  } catch (error) {
-    console.error('Error al generar la descarga:', error);
-  }
-};
 
     const handleExport = async (type: 'html' | 'docx' | 'pdf') => {
         setIsMenuOpen(false);
@@ -184,15 +205,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         const { state, dispatch } = view;
         const { from, to } = state.selection.main;
         const selectedText = state.sliceDoc(from, to);
-        
+
         const textToInsert = prefix + selectedText + suffix;
-        
+
         dispatch({
             changes: { from, to, insert: textToInsert },
             selection: { anchor: from + prefix.length, head: from + prefix.length + selectedText.length },
             userEvent: 'input.format'
         });
-        
+
         view.focus();
     };
 
@@ -204,7 +225,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
         const { from } = state.selection.main;
         const line = state.doc.lineAt(from);
         const lineText = line.text;
-        
+
         let changes;
 
         if (lineText.startsWith(prefix)) {
@@ -222,7 +243,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
              // Add prefix
              changes = { from: line.from, insert: prefix };
         }
-        
+
         dispatch({ changes, userEvent: 'input.format' });
         view.focus();
     };
@@ -232,9 +253,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
          if (!view || !view.dispatch) return;
 
          const doc = view.state.doc.toString();
-         let newText = doc.replace(/[ \t]+$/gm, ''); 
-         newText = newText.replace(/\n{3,}/g, '\n\n'); 
-         
+         let newText = doc.replace(/[ \t]+$/gm, '');
+         newText = newText.replace(/\n{3,}/g, '\n\n');
+
          view.dispatch({
              changes: { from: 0, to: view.state.doc.length, insert: newText },
              userEvent: 'input.format.document'
@@ -246,7 +267,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
 
     return (
         <header className="flex flex-wrap items-center justify-between px-4 py-2 border-b border-border/40 z-50 sticky top-0 bg-background/80 backdrop-blur-xl transition-all duration-500 gap-y-2">
-            <ConfirmModal 
+            <ConfirmModal
                 isOpen={isConfirmOpen}
                 title="Create New File?"
                 message="Unsaved changes will be lost. Are you sure you want to start a new file?"
@@ -257,17 +278,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                 isOpen={isInputOpen}
                 title="Save to Google Drive"
                 message="Enter a filename for your document:"
-                defaultValue="zenith-doc.md"
-                onConfirm={handleConfirmSave}
+                defaultValue={pendingSaveName}
+                onConfirm={handleConfirmDriveSave}
                 onCancel={() => setIsInputOpen(false)}
             />
             {/* Hidden Input for Open File */}
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleOpenFile} 
-                accept=".md,.txt" 
-                className="hidden" 
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleOpenFile}
+                accept=".md,.txt"
+                className="hidden"
             />
 
             <div className="flex flex-wrap items-center gap-4 py-1">
@@ -279,17 +300,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                     {!isZenMode && <h1 className="text-lg font-bold tracking-tight bg-gradient-to-br from-indigo-500 to-purple-600 bg-clip-text text-transparent hidden md:block">Zenith</h1>}
                 </div>
 
-                {/* Group 1: File Actions */}
+                {/* Group 1: File Actions (Unified) */}
                 <div className="flex items-center gap-1 border-r border-border/20 pr-2">
                     <button onClick={handleNewFileClick} className={btnClass} title="New File">
                         <FilePlus size={18} />
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className={btnClass} title="Open File">
+                    <button onClick={() => fileInputRef.current?.click()} className={btnClass} title="Open Local File">
                         <FolderOpen size={18} />
                     </button>
-                    <button onClick={handleSaveMd} className={btnClass} title="Save Markdown">
-                        <Save size={18} />
+
+                    {/* Unified Save Button */}
+                     <button
+                        onClick={handleSaveClick}
+                        className={btnClass}
+                        title={isAuthenticated ? (driveFileId ? "Save Change to Drive" : "Save to Drive") : "Download Markdown"}
+                        disabled={isDriveLoading}
+                    >
+                         {isDriveLoading ? <Loader2 size={18} className="animate-spin" /> : (isAuthenticated ? <Cloud size={18} /> : <Save size={18} />)}
                     </button>
+
+                     {/* Open from Drive Button (Only when auth) */}
+                     {isAuthenticated && (
+                        <button
+                            onClick={handleOpenFromDrive}
+                            className={btnClass}
+                            title="Open from Drive"
+                            disabled={isDriveLoading}
+                        >
+                            <DownloadCloud size={18} />
+                        </button>
+                     )}
+
                     {/* Export Menu */}
                     <div className="relative">
                         <button
@@ -301,7 +342,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                             {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={18} />}
                             <ChevronDown size={12} className={isMenuOpen ? "rotate-180 transition-transform" : "transition-transform"} />
                         </button>
-                        
+
                         {isMenuOpen && (
                             <>
                                 <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)}></div>
@@ -321,28 +362,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ editorRef }) => {
                         )}
                     </div>
                 </div>
-
-                 {/* Group 2: Drive Actions */}
-                 {isAuthenticated && (
-                    <div className="flex items-center gap-1 border-r border-border/20 pr-2">
-                         <button 
-                            onClick={handleSaveToDriveClick} 
-                            className={btnClass} 
-                            title="Save to Drive"
-                            disabled={isDriveLoading}
-                         >
-                            {isDriveLoading ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-                         </button>
-                         <button 
-                            onClick={handleOpenFromDrive} 
-                            className={btnClass} 
-                            title="Open from Drive"
-                            disabled={isDriveLoading}
-                         >
-                            <DownloadCloud size={18} />
-                         </button>
-                    </div>
-                 )}
 
                 {/* Group 3: History */}
                 <div className="flex items-center gap-1 border-r border-border/20 pr-2">

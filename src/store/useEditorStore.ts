@@ -19,6 +19,9 @@ interface EditorState {
   addToHistory: (newContent: string) => void;
   undo: () => void;
   redo: () => void;
+  // Google Drive
+  driveFileId: string | null;
+  setDriveFileId: (id: string | null) => void;
 }
 
 export const useEditorStore = create<EditorState>()(
@@ -26,6 +29,7 @@ export const useEditorStore = create<EditorState>()(
     (set) => ({
       markdown: '# Welcome to Zenith Editor\n\nStart typing...',
       setMarkdown: (markdown) => set({ markdown }),
+      driveFileId: null, // Initial state
       
       // History
       history: ['# Welcome to Zenith Editor\n\nStart typing...'],
@@ -76,6 +80,7 @@ export const useEditorStore = create<EditorState>()(
       setOutlineWidth: (outlineWidth) => set({ outlineWidth }),
       previewWidth: 50, // Percentage
       setPreviewWidth: (previewWidth) => set({ previewWidth }),
+      setDriveFileId: (driveFileId) => set({ driveFileId }),
       toggleLineCheckbox: (line) => set((state) => {
           const lines = state.markdown.split('\n');
           const index = line - 1;
@@ -102,7 +107,8 @@ export const useEditorStore = create<EditorState>()(
         theme: state.theme,
         outlineWidth: state.outlineWidth,
         previewWidth: state.previewWidth,
-        // Don't persist history to avoid bloat, or do? User didn't specify. 
+        driveFileId: state.driveFileId,
+        // Don't persist history to avoid bloat, or do? User didn't specify.  
         // Persisting text but not history is safer for storage limits.
       }), 
     }
